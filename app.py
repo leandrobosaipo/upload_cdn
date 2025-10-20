@@ -18,7 +18,30 @@ app = Flask(__name__)
 
 # Configuração para uploads maiores
 # app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
+# app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
+# Configuração para uploads maiores (permitindo sobrescrita via variável de ambiente)
+DEFAULT_MAX_CONTENT_LENGTH_MB = 100
+max_content_length_env = os.environ.get("MAX_CONTENT_LENGTH_MB")
+
+try:
+    if max_content_length_env is None:
+        raise ValueError
+    max_content_length_mb = int(max_content_length_env)
+    if max_content_length_mb <= 0:
+        raise ValueError
+except ValueError:
+    max_content_length_mb = DEFAULT_MAX_CONTENT_LENGTH_MB
+    if max_content_length_env is not None:
+        print(
+            f"⚠️ Valor inválido para MAX_CONTENT_LENGTH_MB ('{max_content_length_env}'). "
+            f"Usando padrão de {DEFAULT_MAX_CONTENT_LENGTH_MB}MB."
+        )
+        logger.warning(
+            "MAX_CONTENT_LENGTH_MB inválido fornecido. Utilizando valor padrão de %sMB",
+            DEFAULT_MAX_CONTENT_LENGTH_MB,
+        )
+
+app.config['MAX_CONTENT_LENGTH'] = max_content_length_mb * 1024 * 1024
 
 # Configurações do Spaces
 SPACES_REGION = "nyc3"

@@ -136,6 +136,7 @@ python test_api.py
 | `SPACES_KEY` | Chave de acesso do DigitalOcean Spaces | ✅ |
 | `SPACES_SECRET` | Secret de acesso do DigitalOcean Spaces | ✅ |
 | `PORT` | Porta da aplicação (padrão: 8080) | ❌ |
+| `MAX_CONTENT_LENGTH_MB` | Limite máximo do upload em MB (padrão: 100) | ❌ |
 
 ### Configurações do Spaces
 

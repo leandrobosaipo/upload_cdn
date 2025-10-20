@@ -21,7 +21,9 @@ echo "   - PORT: ${PORT:-8080}"
 echo "   - WORKERS: ${WORKERS:-2}"
 echo "   - THREADS: 4"
 echo "   - TIMEOUT: ${TIMEOUT:-180}"
-echo "   - MAX_FILE_SIZE: 100MB"
+# echo "   - MAX_FILE_SIZE: 100MB"
+echo "   - MAX_FILE_SIZE: ${MAX_CONTENT_LENGTH_MB:-100}MB"
+
 
 # Aguardar um pouco para garantir que tudo está pronto
 sleep 2
