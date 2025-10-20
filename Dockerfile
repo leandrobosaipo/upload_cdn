@@ -24,5 +24,5 @@ ENV PYTHONUNBUFFERED=1
 # Expor porta
 EXPOSE 8080
 
-# Comando para executar a aplicação
-CMD ["python", "app.py"]
+# Comando para executar a aplicação com Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120", "--keep-alive", "2", "--max-requests", "1000", "--max-requests-jitter", "100", "app:app"]

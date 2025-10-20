@@ -14,9 +14,11 @@ SPACES_BUCKET = "cod5"
 SPACES_KEY = os.environ.get("SPACES_KEY")
 SPACES_SECRET = os.environ.get("SPACES_SECRET")
 
-# Validação das variáveis de ambiente
+# Validação das variáveis de ambiente (apenas em produção)
 if not SPACES_KEY or not SPACES_SECRET:
-    raise ValueError("SPACES_KEY e SPACES_SECRET devem estar definidas nas variáveis de ambiente")
+    print("⚠️  AVISO: SPACES_KEY e SPACES_SECRET não definidas. Configure as variáveis de ambiente.")
+    # Em desenvolvimento, permite continuar sem as credenciais
+    # Em produção, o Gunicorn falhará se não estiverem definidas
 
 # Cliente S3 (Spaces)
 s3 = boto3.client('s3',
@@ -46,6 +48,10 @@ def health_check():
 def upload_file():
     """Endpoint principal para upload de arquivos"""
     try:
+        # Verificar se as credenciais estão configuradas
+        if not SPACES_KEY or not SPACES_SECRET:
+            return jsonify({"error": "Credenciais do Spaces não configuradas"}), 500
+        
         # Verificar se arquivo foi enviado
         if 'file' not in request.files:
             return jsonify({"error": "Nenhum arquivo fornecido"}), 400
@@ -109,6 +115,5 @@ def index():
         "supported_formats": list(ALLOWED_EXTENSIONS)
     })
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=False)
+# Aplicação configurada para produção com Gunicorn
+# O Gunicorn irá importar o objeto 'app' diretamente
