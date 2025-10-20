@@ -107,6 +107,14 @@ def upload_file():
         
         print(f"✅ Arquivo válido: {file.filename}")
         
+        # Capturar o tamanho real do arquivo
+        file.stream.seek(0, 2)  # Vai para o fim do arquivo
+        file_size = file.stream.tell()
+        file.stream.seek(0)     # Volta ao início para permitir o upload
+        
+        print(f"📏 Tamanho do arquivo: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
+        logger.info(f"Tamanho do arquivo: {file_size} bytes")
+        
         # Gerar nome único para o arquivo
         original_filename = secure_filename(file.filename)
         file_extension = original_filename.rsplit('.', 1)[1].lower()
@@ -140,7 +148,7 @@ def upload_file():
             "url": file_url,
             "filename": unique_filename,
             "original_filename": original_filename,
-            "size": file.content_length,
+            "size": file_size,
             "content_type": file.content_type
         })
         
