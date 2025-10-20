@@ -17,7 +17,8 @@ logger.info("Iniciando Upload CDN API")
 app = Flask(__name__)
 
 # Configuração para uploads maiores
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+# app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
 
 # Configurações do Spaces
 SPACES_REGION = "nyc3"
