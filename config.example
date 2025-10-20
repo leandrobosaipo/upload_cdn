@@ -1,0 +1,6 @@
+# Configurações do DigitalOcean Spaces
+SPACES_KEY=LZQAHCBDGFOLQR5UUHFR
+SPACES_SECRET=QVrgE+F/Rr0IDkZF5y0AdPtnnh2VMuPo8cCVrdxKzX4
+
+# Configurações da aplicação
+PORT=8080
