@@ -4,6 +4,14 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import uuid
 from datetime import datetime
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+print("🚀 Iniciando Upload CDN API...")
+logger.info("Iniciando Upload CDN API")
 
 app = Flask(__name__)
 
@@ -14,19 +22,46 @@ SPACES_BUCKET = "cod5"
 SPACES_KEY = os.environ.get("SPACES_KEY")
 SPACES_SECRET = os.environ.get("SPACES_SECRET")
 
-# Validação das variáveis de ambiente (apenas em produção)
-if not SPACES_KEY or not SPACES_SECRET:
-    print("⚠️  AVISO: SPACES_KEY e SPACES_SECRET não definidas. Configure as variáveis de ambiente.")
-    # Em desenvolvimento, permite continuar sem as credenciais
-    # Em produção, o Gunicorn falhará se não estiverem definidas
+print(f"🔧 Configurações carregadas:")
+print(f"   - SPACES_REGION: {SPACES_REGION}")
+print(f"   - SPACES_ENDPOINT: {SPACES_ENDPOINT}")
+print(f"   - SPACES_BUCKET: {SPACES_BUCKET}")
+print(f"   - SPACES_KEY: {'✅ Definida' if SPACES_KEY else '❌ Não definida'}")
+print(f"   - SPACES_SECRET: {'✅ Definida' if SPACES_SECRET else '❌ Não definida'}")
 
-# Cliente S3 (Spaces)
-s3 = boto3.client('s3',
-    region_name=SPACES_REGION,
-    endpoint_url=SPACES_ENDPOINT,
-    aws_access_key_id=SPACES_KEY,
-    aws_secret_access_key=SPACES_SECRET
-)
+logger.info(f"SPACES_KEY definida: {bool(SPACES_KEY)}")
+logger.info(f"SPACES_SECRET definida: {bool(SPACES_SECRET)}")
+
+# Cliente S3 será inicializado apenas quando necessário
+s3 = None
+
+def get_s3_client():
+    """Inicializa o cliente S3 apenas quando necessário"""
+    global s3
+    if s3 is None:
+        try:
+            print("🔗 Inicializando cliente S3...")
+            logger.info("Inicializando cliente S3")
+            
+            if not SPACES_KEY or not SPACES_SECRET:
+                raise ValueError("Credenciais do Spaces não configuradas")
+            
+            s3 = boto3.client('s3',
+                region_name=SPACES_REGION,
+                endpoint_url=SPACES_ENDPOINT,
+                aws_access_key_id=SPACES_KEY,
+                aws_secret_access_key=SPACES_SECRET
+            )
+            
+            print("✅ Cliente S3 inicializado com sucesso")
+            logger.info("Cliente S3 inicializado com sucesso")
+            
+        except Exception as e:
+            print(f"❌ Erro ao inicializar cliente S3: {e}")
+            logger.error(f"Erro ao inicializar cliente S3: {e}")
+            raise
+    
+    return s3
 
 # Tipos de arquivo permitidos
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'}
@@ -48,33 +83,43 @@ def health_check():
 def upload_file():
     """Endpoint principal para upload de arquivos"""
     try:
-        # Verificar se as credenciais estão configuradas
-        if not SPACES_KEY or not SPACES_SECRET:
-            return jsonify({"error": "Credenciais do Spaces não configuradas"}), 500
+        print("📤 Recebendo requisição de upload")
+        logger.info("Recebendo requisição de upload")
         
         # Verificar se arquivo foi enviado
         if 'file' not in request.files:
+            print("❌ Nenhum arquivo fornecido")
             return jsonify({"error": "Nenhum arquivo fornecido"}), 400
         
         file = request.files['file']
         
         # Verificar se arquivo tem nome
         if file.filename == '':
+            print("❌ Arquivo sem nome")
             return jsonify({"error": "Arquivo sem nome"}), 400
         
         # Verificar se tipo de arquivo é permitido
         if not allowed_file(file.filename):
+            print(f"❌ Tipo de arquivo não permitido: {file.filename}")
             return jsonify({
                 "error": f"Tipo de arquivo não permitido. Tipos aceitos: {', '.join(ALLOWED_EXTENSIONS)}"
             }), 400
+        
+        print(f"✅ Arquivo válido: {file.filename}")
         
         # Gerar nome único para o arquivo
         original_filename = secure_filename(file.filename)
         file_extension = original_filename.rsplit('.', 1)[1].lower()
         unique_filename = f"{uuid.uuid4()}.{file_extension}"
         
+        print(f"🔄 Iniciando upload: {unique_filename}")
+        logger.info(f"Iniciando upload: {unique_filename}")
+        
+        # Obter cliente S3 (inicializa se necessário)
+        s3_client = get_s3_client()
+        
         # Upload para o Spaces
-        s3.upload_fileobj(
+        s3_client.upload_fileobj(
             Fileobj=file,
             Bucket=SPACES_BUCKET,
             Key=unique_filename,
@@ -87,6 +132,9 @@ def upload_file():
         # URL pública do arquivo
         file_url = f"https://{SPACES_BUCKET}.{SPACES_REGION}.digitaloceanspaces.com/{unique_filename}"
         
+        print(f"✅ Upload concluído: {file_url}")
+        logger.info(f"Upload concluído: {file_url}")
+        
         return jsonify({
             "success": True, 
             "url": file_url,
@@ -97,6 +145,8 @@ def upload_file():
         })
         
     except Exception as e:
+        print(f"❌ Erro no upload: {e}")
+        logger.error(f"Erro no upload: {e}")
         return jsonify({
             "error": f"Erro interno do servidor: {str(e)}"
         }), 500
@@ -114,6 +164,17 @@ def index():
         },
         "supported_formats": list(ALLOWED_EXTENSIONS)
     })
+
+# Logs de inicialização
+print("✅ Flask app configurado com sucesso")
+print("✅ Rotas registradas:")
+print("   - GET  /")
+print("   - GET  /health")
+print("   - POST /upload")
+print("🚀 Aplicação pronta para receber requisições!")
+
+logger.info("Flask app configurado com sucesso")
+logger.info("Aplicação pronta para receber requisições")
 
 # Aplicação configurada para produção com Gunicorn
 # O Gunicorn irá importar o objeto 'app' diretamente
