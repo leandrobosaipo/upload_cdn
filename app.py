@@ -2,6 +2,7 @@ import os
 import boto3
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 import uuid
 from datetime import datetime
 import logging
@@ -14,6 +15,9 @@ print("🚀 Iniciando Upload CDN API...")
 logger.info("Iniciando Upload CDN API")
 
 app = Flask(__name__)
+
+# Configuração para uploads maiores
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 
 # Configurações do Spaces
 SPACES_REGION = "nyc3"
@@ -84,19 +88,22 @@ def upload_file():
     """Endpoint principal para upload de arquivos"""
     try:
         print("📤 Recebendo requisição de upload")
+        print(f"🔍 Content-Type: {request.content_type}")
+        print(f"🔍 Files keys: {list(request.files.keys())}")
         logger.info("Recebendo requisição de upload")
         
         # Verificar se arquivo foi enviado
         if 'file' not in request.files:
             print("❌ Nenhum arquivo fornecido")
+            print(f"   Files disponíveis: {list(request.files.keys())}")
             return jsonify({"error": "Nenhum arquivo fornecido"}), 400
         
         file = request.files['file']
         
         # Verificar se arquivo tem nome
-        if file.filename == '':
-            print("❌ Arquivo sem nome")
-            return jsonify({"error": "Arquivo sem nome"}), 400
+        if not file or file.filename == '':
+            print("❌ Arquivo sem nome ou vazio")
+            return jsonify({"error": "Arquivo sem nome ou vazio"}), 400
         
         # Verificar se tipo de arquivo é permitido
         if not allowed_file(file.filename):
@@ -108,12 +115,12 @@ def upload_file():
         print(f"✅ Arquivo válido: {file.filename}")
         
         # Capturar o tamanho real do arquivo
-        file.stream.seek(0, 2)  # Vai para o fim do arquivo
-        file_size = file.stream.tell()
-        file.stream.seek(0)     # Volta ao início para permitir o upload
+        file.stream.seek(0, 2)  # Ir até o final do arquivo
+        size = file.stream.tell()
+        file.stream.seek(0)     # Voltar para o começo
         
-        print(f"📏 Tamanho do arquivo: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
-        logger.info(f"Tamanho do arquivo: {file_size} bytes")
+        print(f"📏 Tamanho do arquivo: {size} bytes ({size / 1024 / 1024:.2f} MB)")
+        logger.info(f"Tamanho do arquivo: {size} bytes")
         
         # Gerar nome único para o arquivo
         original_filename = secure_filename(file.filename)
@@ -148,7 +155,7 @@ def upload_file():
             "url": file_url,
             "filename": unique_filename,
             "original_filename": original_filename,
-            "size": file_size,
+            "size": size,
             "content_type": file.content_type
         })
         
@@ -183,6 +190,15 @@ print("🚀 Aplicação pronta para receber requisições!")
 
 logger.info("Flask app configurado com sucesso")
 logger.info("Aplicação pronta para receber requisições")
+
+# Handler para arquivos muito grandes
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(e):
+    print("❌ Arquivo muito grande")
+    logger.error("Arquivo muito grande")
+    return jsonify({
+        "error": "Arquivo muito grande. Tamanho máximo permitido: 100MB"
+    }), 413
 
 # Aplicação configurada para produção com Gunicorn
 # O Gunicorn irá importar o objeto 'app' diretamente

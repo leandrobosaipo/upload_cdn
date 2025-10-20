@@ -19,18 +19,21 @@ echo "✅ Credenciais verificadas"
 echo "🔧 Configurações:"
 echo "   - PORT: ${PORT:-8080}"
 echo "   - WORKERS: ${WORKERS:-2}"
-echo "   - TIMEOUT: ${TIMEOUT:-120}"
+echo "   - THREADS: 4"
+echo "   - TIMEOUT: ${TIMEOUT:-180}"
+echo "   - MAX_FILE_SIZE: 100MB"
 
 # Aguardar um pouco para garantir que tudo está pronto
 sleep 2
 
 echo "🚀 Iniciando Gunicorn..."
 
-# Executar Gunicorn com configurações otimizadas
+# Executar Gunicorn com configurações otimizadas para uploads grandes
 exec gunicorn \
     --bind "0.0.0.0:${PORT:-8080}" \
     --workers "${WORKERS:-2}" \
-    --timeout "${TIMEOUT:-120}" \
+    --threads 4 \
+    --timeout "${TIMEOUT:-180}" \
     --keep-alive 2 \
     --max-requests 1000 \
     --max-requests-jitter 100 \
