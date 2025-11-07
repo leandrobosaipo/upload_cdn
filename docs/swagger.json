@@ -248,7 +248,8 @@
                           "throughput_mbps": 4.782
                         }
                       },
-                      "url": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                      "url": "https://cod5.nyc3.digitaloceanspaces.com/uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                      "callback_url": "https://cod5.nyc3.digitaloceanspaces.com/uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.json",
                       "filename": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
                       "original_filename": "meu_video.mp4",
                       "size": 1320220,

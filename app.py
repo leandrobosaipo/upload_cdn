@@ -14,6 +14,7 @@ import json
 import subprocess
 import tempfile
 import re
+from io import BytesIO
 from typing import Dict, Any, Optional
 
 # Configurar logging
@@ -52,25 +53,51 @@ except ValueError:
 
 app.config['MAX_CONTENT_LENGTH'] = max_content_length_mb * 1024 * 1024
 
-# Configurações do Spaces
-SPACES_REGION = "nyc3"
-SPACES_ENDPOINT = "https://nyc3.digitaloceanspaces.com"
-SPACES_BUCKET = "cod5"
+# Configurações do Spaces (todas via variáveis de ambiente)
+SPACES_REGION = os.environ.get("SPACES_REGION")
+SPACES_ENDPOINT = os.environ.get("SPACES_ENDPOINT")
+SPACES_BUCKET = os.environ.get("SPACES_BUCKET")
 SPACES_KEY = os.environ.get("SPACES_KEY")
 SPACES_SECRET = os.environ.get("SPACES_SECRET")
 
 # Configuração de diretório padrão para uploads
-DEFAULT_UPLOAD_DIR = os.environ.get("DEFAULT_UPLOAD_DIR", "uploads")
+DEFAULT_UPLOAD_DIR = os.environ.get("DEFAULT_UPLOAD_DIR")
+
+# Validar configurações obrigatórias
+missing_configs = []
+if not SPACES_REGION:
+    missing_configs.append("SPACES_REGION")
+if not SPACES_ENDPOINT:
+    missing_configs.append("SPACES_ENDPOINT")
+if not SPACES_BUCKET:
+    missing_configs.append("SPACES_BUCKET")
+if not SPACES_KEY:
+    missing_configs.append("SPACES_KEY")
+if not SPACES_SECRET:
+    missing_configs.append("SPACES_SECRET")
+if not DEFAULT_UPLOAD_DIR:
+    missing_configs.append("DEFAULT_UPLOAD_DIR")
+
+if missing_configs:
+    print(f"❌ ERRO: Variáveis de ambiente obrigatórias não configuradas: {', '.join(missing_configs)}")
+    logger.error(f"Variáveis de ambiente obrigatórias não configuradas: {', '.join(missing_configs)}")
+    print("   Configure essas variáveis antes de iniciar a aplicação.")
+    logger.error("Aplicação não pode iniciar sem essas configurações")
 
 print(f"🔧 Configurações carregadas:")
-print(f"   - SPACES_REGION: {SPACES_REGION}")
-print(f"   - SPACES_ENDPOINT: {SPACES_ENDPOINT}")
-print(f"   - SPACES_BUCKET: {SPACES_BUCKET}")
+print(f"   - SPACES_REGION: {SPACES_REGION or '❌ Não definida'}")
+print(f"   - SPACES_ENDPOINT: {SPACES_ENDPOINT or '❌ Não definida'}")
+print(f"   - SPACES_BUCKET: {SPACES_BUCKET or '❌ Não definida'}")
 print(f"   - SPACES_KEY: {'✅ Definida' if SPACES_KEY else '❌ Não definida'}")
 print(f"   - SPACES_SECRET: {'✅ Definida' if SPACES_SECRET else '❌ Não definida'}")
+print(f"   - DEFAULT_UPLOAD_DIR: {DEFAULT_UPLOAD_DIR or '❌ Não definida'}")
 
+logger.info(f"SPACES_REGION: {SPACES_REGION}")
+logger.info(f"SPACES_ENDPOINT: {SPACES_ENDPOINT}")
+logger.info(f"SPACES_BUCKET: {SPACES_BUCKET}")
 logger.info(f"SPACES_KEY definida: {bool(SPACES_KEY)}")
 logger.info(f"SPACES_SECRET definida: {bool(SPACES_SECRET)}")
+logger.info(f"DEFAULT_UPLOAD_DIR: {DEFAULT_UPLOAD_DIR}")
 
 # Cliente S3 será inicializado apenas quando necessário
 s3 = None
@@ -235,6 +262,9 @@ def get_file_category(content_type: str, extension: str) -> Dict[str, Any]:
 def validate_and_sanitize_folder(folder: Optional[str]) -> str:
     """Valida e sanitiza o nome do diretório, prevenindo path traversal"""
     if not folder:
+        if not DEFAULT_UPLOAD_DIR:
+            logger.error("DEFAULT_UPLOAD_DIR não configurado e nenhum folder fornecido")
+            raise ValueError("DEFAULT_UPLOAD_DIR não está configurado")
         return DEFAULT_UPLOAD_DIR
     
     # Remover espaços e caracteres perigosos
@@ -243,6 +273,8 @@ def validate_and_sanitize_folder(folder: Optional[str]) -> str:
     # Prevenir path traversal
     if '..' in folder or folder.startswith('/') or '\\' in folder:
         logger.warning(f"Tentativa de path traversal detectada: {folder}")
+        if not DEFAULT_UPLOAD_DIR:
+            raise ValueError("DEFAULT_UPLOAD_DIR não está configurado")
         return DEFAULT_UPLOAD_DIR
     
     # Permitir apenas letras, números, hífen, underscore e barras
@@ -256,7 +288,7 @@ def validate_and_sanitize_folder(folder: Optional[str]) -> str:
     if len(folder) > 200:
         folder = folder[:200]
     
-    return folder if folder else DEFAULT_UPLOAD_DIR
+    return folder if folder else (DEFAULT_UPLOAD_DIR if DEFAULT_UPLOAD_DIR else "uploads")
 
 def extract_media_metadata(file_path: str, content_type: str) -> Optional[Dict[str, Any]]:
     """Extrai metadados de mídia usando ffprobe"""
@@ -735,6 +767,40 @@ def upload_file():
             "size": size,
             "content_type": file.content_type
         }
+        
+        # Salvar callback JSON no mesmo diretório com mesmo nome base
+        callback_json_key = f"{target_folder}/{unique_filename.rsplit('.', 1)[0]}.json" if target_folder else f"{unique_filename.rsplit('.', 1)[0]}.json"
+        callback_json_url = f"https://{SPACES_BUCKET}.{SPACES_REGION}.digitaloceanspaces.com/{callback_json_key}"
+        
+        try:
+            # Converter response_data para JSON string
+            callback_json_str = json.dumps(response_data, ensure_ascii=False, indent=2)
+            callback_json_bytes = callback_json_str.encode('utf-8')
+            
+            # Criar objeto BytesIO para upload
+            callback_file_obj = BytesIO(callback_json_bytes)
+            
+            # Upload do JSON
+            s3_client.upload_fileobj(
+                Fileobj=callback_file_obj,
+                Bucket=SPACES_BUCKET,
+                Key=callback_json_key,
+                ExtraArgs={
+                    'ACL': 'public-read',
+                    'ContentType': 'application/json'
+                }
+            )
+            
+            print(f"✅ Callback JSON salvo: {callback_json_url}")
+            logger.info(f"Callback JSON salvo: {callback_json_url}")
+            
+            # Adicionar URL do callback na resposta
+            response_data["callback_url"] = callback_json_url
+            
+        except Exception as e:
+            logger.warning(f"Erro ao salvar callback JSON: {e}")
+            print(f"⚠️ Aviso: Não foi possível salvar callback JSON: {e}")
+            # Continuar mesmo se falhar o salvamento do JSON
         
         return jsonify(response_data)
         

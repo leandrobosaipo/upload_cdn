@@ -1,6 +1,13 @@
-# Configurações do DigitalOcean Spaces
-SPACES_KEY=LZQAHCBDGFOLQR5UUHFR
-SPACES_SECRET=QVrgE+F/Rr0IDkZF5y0AdPtnnh2VMuPo8cCVrdxKzX4
+# Configurações do DigitalOcean Spaces (OBRIGATÓRIAS)
+SPACES_KEY=sua_chave_aqui
+SPACES_SECRET=seu_secret_aqui
+SPACES_BUCKET=seu_bucket_aqui
+SPACES_REGION=nyc3
+SPACES_ENDPOINT=https://nyc3.digitaloceanspaces.com
 
-# Configurações da aplicação
+# Configuração de diretório padrão para uploads (OBRIGATÓRIA)
+DEFAULT_UPLOAD_DIR=uploads
+
+# Configurações da aplicação (OPCIONAIS)
 PORT=8080
+MAX_CONTENT_LENGTH_MB=100
