@@ -140,25 +140,91 @@
                 },
                 "examples": {
                   "video": {
-                    "summary": "Upload de vídeo",
+                    "summary": "Upload de vídeo com resposta enriquecida",
                     "value": {
                       "success": true,
-                      "url": "https://cod5.nyc3.digitaloceanspaces.com/a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4",
-                      "filename": "a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4",
+                      "arquivo": {
+                        "id": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "nome_original": "meu_video.mp4",
+                        "nome_armazenado": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "hash_md5": "d41d8cd98f00b204e9800998ecf8427e",
+                        "tamanho": {
+                          "bytes": 1320220,
+                          "kilobytes": 1289.28,
+                          "megabytes": 1.26,
+                          "gigabytes": 0.0012,
+                          "formatted": "1.26 MB",
+                          "descricao_humana": "1.26 megabytes"
+                        },
+                        "tipo_mime": "video/mp4",
+                        "extensao": "mp4",
+                        "categoria": {
+                          "categoria": "video",
+                          "categoria_descricao": "Vídeo",
+                          "tipo_midia": "Áudio e Vídeo",
+                          "extensao": "mp4"
+                        },
+                        "url_publica": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "url_cdn": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "descricao_humana": "Arquivo vídeo 'meu_video.mp4' (1.26 megabytes)"
+                      },
+                      "sessao": {
+                        "id_sessao": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                        "ip_cliente": "192.168.1.100",
+                        "ip_original": "192.168.1.100",
+                        "user_agent": "Mozilla/5.0...",
+                        "referer": "",
+                        "idioma_preferido": "pt-BR,pt;q=0.9",
+                        "headers": {},
+                        "descricao_humana": "Requisição de 192.168.1.100 via Mozilla/5.0..."
+                      },
+                      "upload": {
+                        "timestamp_inicio": "2024-01-15T10:30:00.123456",
+                        "timestamp_inicio_unix": 1705315800.123,
+                        "timestamp_fim": "2024-01-15T10:30:02.456789",
+                        "timestamp_fim_unix": 1705315802.456,
+                        "duracao_total": {
+                          "segundos": 2.33,
+                          "formatted": "2.33 s",
+                          "descricao_humana": "2.33 segundos"
+                        },
+                        "duracao_upload": {
+                          "segundos": 2.10,
+                          "formatted": "2.10 s",
+                          "descricao_humana": "2.10 segundos"
+                        },
+                        "velocidade_bytes_por_segundo": 628676.19,
+                        "velocidade_mbps": 4.78,
+                        "velocidade_formatted": "4.78 Mbps",
+                        "status": "concluido",
+                        "bucket": "cod5",
+                        "regiao": "nyc3",
+                        "endpoint": "https://nyc3.digitaloceanspaces.com",
+                        "descricao_humana": "Upload concluído em 2.10 segundos com velocidade média de 4.78 Mbps"
+                      },
+                      "analytics": {
+                        "id_transacao": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                        "timestamp_processamento": "2024-01-15T10:30:02.456789",
+                        "tamanho_bytes": 1320220,
+                        "tamanho_mb": 1.259,
+                        "duracao_segundos": 2.333,
+                        "velocidade_mbps": 4.782,
+                        "categoria_arquivo": "video",
+                        "tipo_midia": "Áudio e Vídeo",
+                        "hash_arquivo": "d41d8cd98f00b204e9800998ecf8427e",
+                        "ip_cliente": "192.168.1.100",
+                        "metrica_performance": {
+                          "tempo_processamento_ms": 2333.33,
+                          "tempo_upload_ms": 2100.00,
+                          "throughput_bytes_per_sec": 628676.19,
+                          "throughput_mbps": 4.782
+                        }
+                      },
+                      "url": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                      "filename": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
                       "original_filename": "meu_video.mp4",
-                      "size": 52428800,
+                      "size": 1320220,
                       "content_type": "video/mp4"
-                    }
-                  },
-                  "image": {
-                    "summary": "Upload de imagem",
-                    "value": {
-                      "success": true,
-                      "url": "https://cod5.nyc3.digitaloceanspaces.com/b2c3d4e5-f6a7-8901-bcde-f12345678901.jpg",
-                      "filename": "b2c3d4e5-f6a7-8901-bcde-f12345678901.jpg",
-                      "original_filename": "foto.jpg",
-                      "size": 1048576,
-                      "content_type": "image/jpeg"
                     }
                   }
                 }
@@ -359,40 +425,150 @@
       },
       "UploadSuccessResponse": {
         "type": "object",
+        "description": "Resposta enriquecida com metadados detalhados do arquivo, sessão, upload e analytics",
         "properties": {
           "success": {
             "type": "boolean",
             "description": "Indica se o upload foi bem-sucedido",
             "example": true
           },
+          "arquivo": {
+            "type": "object",
+            "description": "Informações detalhadas do arquivo enviado",
+            "properties": {
+              "id": {"type": "string", "description": "ID único do arquivo (UUID)", "example": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4"},
+              "nome_original": {"type": "string", "description": "Nome original do arquivo", "example": "meu_video.mp4"},
+              "nome_armazenado": {"type": "string", "description": "Nome único gerado para armazenamento", "example": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4"},
+              "hash_md5": {"type": "string", "description": "Hash MD5 do arquivo", "example": "d41d8cd98f00b204e9800998ecf8427e"},
+              "tamanho": {
+                "type": "object",
+                "description": "Tamanho do arquivo em diferentes unidades",
+                "properties": {
+                  "bytes": {"type": "integer"},
+                  "kilobytes": {"type": "number"},
+                  "megabytes": {"type": "number"},
+                  "gigabytes": {"type": "number"},
+                  "formatted": {"type": "string"},
+                  "descricao_humana": {"type": "string"}
+                }
+              },
+              "tipo_mime": {"type": "string", "example": "video/mp4"},
+              "extensao": {"type": "string", "example": "mp4"},
+              "categoria": {
+                "type": "object",
+                "properties": {
+                  "categoria": {"type": "string", "example": "video"},
+                  "categoria_descricao": {"type": "string", "example": "Vídeo"},
+                  "tipo_midia": {"type": "string", "example": "Áudio e Vídeo"},
+                  "extensao": {"type": "string", "example": "mp4"}
+                }
+              },
+              "url_publica": {"type": "string", "format": "uri"},
+              "url_cdn": {"type": "string", "format": "uri"},
+              "descricao_humana": {"type": "string", "example": "Arquivo vídeo 'meu_video.mp4' (1.26 megabytes)"}
+            }
+          },
+          "sessao": {
+            "type": "object",
+            "description": "Informações da sessão/cliente que fez o upload",
+            "properties": {
+              "id_sessao": {"type": "string", "description": "ID único da sessão"},
+              "ip_cliente": {"type": "string", "description": "IP do cliente (considerando proxy)"},
+              "ip_original": {"type": "string", "description": "IP original da requisição"},
+              "user_agent": {"type": "string"},
+              "referer": {"type": "string"},
+              "idioma_preferido": {"type": "string"},
+              "headers": {"type": "object"},
+              "descricao_humana": {"type": "string"}
+            }
+          },
+          "upload": {
+            "type": "object",
+            "description": "Informações detalhadas do processo de upload",
+            "properties": {
+              "timestamp_inicio": {"type": "string", "format": "date-time"},
+              "timestamp_inicio_unix": {"type": "number"},
+              "timestamp_fim": {"type": "string", "format": "date-time"},
+              "timestamp_fim_unix": {"type": "number"},
+              "duracao_total": {
+                "type": "object",
+                "properties": {
+                  "segundos": {"type": "number"},
+                  "formatted": {"type": "string"},
+                  "descricao_humana": {"type": "string"}
+                }
+              },
+              "duracao_upload": {
+                "type": "object",
+                "properties": {
+                  "segundos": {"type": "number"},
+                  "formatted": {"type": "string"},
+                  "descricao_humana": {"type": "string"}
+                }
+              },
+              "velocidade_bytes_por_segundo": {"type": "number"},
+              "velocidade_mbps": {"type": "number"},
+              "velocidade_formatted": {"type": "string"},
+              "status": {"type": "string", "example": "concluido"},
+              "bucket": {"type": "string"},
+              "regiao": {"type": "string"},
+              "endpoint": {"type": "string"},
+              "descricao_humana": {"type": "string"}
+            }
+          },
+          "analytics": {
+            "type": "object",
+            "description": "Dados para análise e dashboards (métricas de performance e marketing)",
+            "properties": {
+              "id_transacao": {"type": "string"},
+              "timestamp_processamento": {"type": "string", "format": "date-time"},
+              "tamanho_bytes": {"type": "integer"},
+              "tamanho_mb": {"type": "number"},
+              "duracao_segundos": {"type": "number"},
+              "velocidade_mbps": {"type": "number"},
+              "categoria_arquivo": {"type": "string"},
+              "tipo_midia": {"type": "string"},
+              "hash_arquivo": {"type": "string"},
+              "ip_cliente": {"type": "string"},
+              "metrica_performance": {
+                "type": "object",
+                "properties": {
+                  "tempo_processamento_ms": {"type": "number"},
+                  "tempo_upload_ms": {"type": "number"},
+                  "throughput_bytes_per_sec": {"type": "number"},
+                  "throughput_mbps": {"type": "number"}
+                }
+              }
+            }
+          },
           "url": {
             "type": "string",
             "format": "uri",
-            "description": "URL pública do arquivo no CDN",
-            "example": "https://cod5.nyc3.digitaloceanspaces.com/a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4"
+            "description": "URL pública do arquivo (campo legado para compatibilidade)",
+            "example": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4"
           },
           "filename": {
             "type": "string",
-            "description": "Nome único gerado para o arquivo (UUID)",
-            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4"
+            "description": "Nome único gerado (campo legado)",
+            "example": "c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4"
           },
           "original_filename": {
             "type": "string",
-            "description": "Nome original do arquivo enviado",
+            "description": "Nome original (campo legado)",
             "example": "meu_video.mp4"
           },
           "size": {
             "type": "integer",
-            "description": "Tamanho do arquivo em bytes",
-            "example": 52428800
+            "description": "Tamanho em bytes (campo legado)",
+            "example": 1320220
           },
           "content_type": {
             "type": "string",
-            "description": "Tipo MIME do arquivo",
+            "description": "Tipo MIME (campo legado)",
             "example": "video/mp4"
           }
         },
-        "required": ["success", "url", "filename", "original_filename", "size", "content_type"]
+        "required": ["success", "arquivo", "sessao", "upload", "analytics"]
       },
       "ErrorResponse": {
         "type": "object",

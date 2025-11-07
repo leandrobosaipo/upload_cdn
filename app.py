@@ -8,6 +8,9 @@ import uuid
 from datetime import datetime
 import logging
 import botocore.exceptions
+import hashlib
+import time
+from typing import Dict, Any
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -100,6 +103,128 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def format_size_human(size_bytes: int) -> Dict[str, Any]:
+    """Formata tamanho do arquivo em diferentes unidades com descrição em pt-BR"""
+    size_kb = size_bytes / 1024
+    size_mb = size_bytes / (1024 * 1024)
+    size_gb = size_bytes / (1024 * 1024 * 1024)
+    
+    if size_gb >= 1:
+        size_str = f"{size_gb:.2f} GB"
+        size_desc = f"{size_gb:.2f} gigabytes"
+    elif size_mb >= 1:
+        size_str = f"{size_mb:.2f} MB"
+        size_desc = f"{size_mb:.2f} megabytes"
+    elif size_kb >= 1:
+        size_str = f"{size_kb:.2f} KB"
+        size_desc = f"{size_kb:.2f} kilobytes"
+    else:
+        size_str = f"{size_bytes} bytes"
+        size_desc = f"{size_bytes} bytes"
+    
+    return {
+        "bytes": size_bytes,
+        "kilobytes": round(size_kb, 2),
+        "megabytes": round(size_mb, 2),
+        "gigabytes": round(size_gb, 4),
+        "formatted": size_str,
+        "descricao_humana": size_desc
+    }
+
+def format_duration_human(seconds: float) -> Dict[str, Any]:
+    """Formata duração em formato humano em pt-BR"""
+    if seconds < 1:
+        ms = seconds * 1000
+        return {
+            "segundos": round(seconds, 3),
+            "milissegundos": round(ms, 0),
+            "formatted": f"{round(ms, 0)} ms",
+            "descricao_humana": f"{round(ms, 0)} milissegundos"
+        }
+    elif seconds < 60:
+        return {
+            "segundos": round(seconds, 2),
+            "formatted": f"{round(seconds, 2)} s",
+            "descricao_humana": f"{round(seconds, 2)} segundos"
+        }
+    else:
+        mins = seconds / 60
+        secs = seconds % 60
+        return {
+            "segundos": round(seconds, 2),
+            "minutos": round(mins, 2),
+            "formatted": f"{int(mins)}m {int(secs)}s",
+            "descricao_humana": f"{int(mins)} minutos e {int(secs)} segundos"
+        }
+
+def calculate_hash(file_obj) -> str:
+    """Calcula hash MD5 do arquivo"""
+    file_obj.seek(0)
+    hash_md5 = hashlib.md5()
+    for chunk in iter(lambda: file_obj.read(4096), b""):
+        hash_md5.update(chunk)
+    file_obj.seek(0)
+    return hash_md5.hexdigest()
+
+def get_client_info() -> Dict[str, Any]:
+    """Extrai informações do cliente da requisição"""
+    ip = request.remote_addr
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    real_ip = request.headers.get('X-Real-IP', '')
+    
+    # Usar IP real se disponível (atrás de proxy)
+    client_ip = forwarded_for.split(',')[0].strip() if forwarded_for else (real_ip if real_ip else ip)
+    
+    user_agent = request.headers.get('User-Agent', 'Desconhecido')
+    referer = request.headers.get('Referer', '')
+    accept_language = request.headers.get('Accept-Language', '')
+    
+    return {
+        "ip": client_ip,
+        "ip_original": ip,
+        "user_agent": user_agent,
+        "referer": referer,
+        "accept_language": accept_language,
+        "headers": {
+            "x_forwarded_for": forwarded_for,
+            "x_real_ip": real_ip,
+            "host": request.headers.get('Host', ''),
+            "content_type": request.content_type
+        }
+    }
+
+def get_file_category(content_type: str, extension: str) -> Dict[str, Any]:
+    """Categoriza o arquivo por tipo"""
+    video_extensions = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
+    image_extensions = {'jpg', 'jpeg', 'png', 'gif'}
+    document_extensions = {'pdf', 'doc', 'docx'}
+    
+    extension_lower = extension.lower()
+    
+    if extension_lower in video_extensions or 'video' in content_type.lower():
+        categoria = "video"
+        categoria_desc = "Vídeo"
+        tipo_midia = "Áudio e Vídeo"
+    elif extension_lower in image_extensions or 'image' in content_type.lower():
+        categoria = "imagem"
+        categoria_desc = "Imagem"
+        tipo_midia = "Imagem"
+    elif extension_lower in document_extensions or 'application' in content_type.lower():
+        categoria = "documento"
+        categoria_desc = "Documento"
+        tipo_midia = "Documento"
+    else:
+        categoria = "outro"
+        categoria_desc = "Outro"
+        tipo_midia = "Outro"
+    
+    return {
+        "categoria": categoria,
+        "categoria_descricao": categoria_desc,
+        "tipo_midia": tipo_midia,
+        "extensao": extension_lower
+    }
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar se a API está funcionando"""
@@ -146,11 +271,19 @@ def health_check():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     """Endpoint principal para upload de arquivos"""
+    # Timestamp de início da requisição
+    timestamp_inicio = datetime.now()
+    timestamp_inicio_iso = timestamp_inicio.isoformat()
+    timestamp_inicio_unix = time.time()
+    
     try:
         print("📤 Recebendo requisição de upload")
         print(f"🔍 Content-Type: {request.content_type}")
         print(f"🔍 Files keys: {list(request.files.keys())}")
         logger.info("Recebendo requisição de upload")
+        
+        # Coletar informações da sessão/cliente
+        client_info = get_client_info()
         
         # Verificar se arquivo foi enviado
         if 'file' not in request.files:
@@ -192,9 +325,6 @@ def upload_file():
         size = file.stream.tell()
         file.stream.seek(0)     # Voltar para o começo
         
-        print(f"📏 Tamanho do arquivo: {size} bytes ({size / 1024 / 1024:.2f} MB)")
-        logger.info(f"Tamanho do arquivo: {size} bytes")
-        
         # Verificar tamanho do arquivo manualmente (backup caso o Flask não capture)
         max_size_bytes = max_content_length_mb * 1024 * 1024
         if size > max_size_bytes:
@@ -211,8 +341,23 @@ def upload_file():
         file_extension = original_filename.rsplit('.', 1)[1].lower()
         unique_filename = f"{uuid.uuid4()}.{file_extension}"
         
+        # Calcular hash do arquivo antes do upload
+        file_hash = calculate_hash(file)
+        
+        # Formatação de tamanho
+        size_info = format_size_human(size)
+        
+        # Categorização do arquivo
+        file_category = get_file_category(file.content_type or '', file_extension)
+        
+        print(f"📏 Tamanho do arquivo: {size} bytes ({size_info['formatted']})")
+        logger.info(f"Tamanho do arquivo: {size} bytes")
+        
         print(f"🔄 Iniciando upload: {unique_filename}")
         logger.info(f"Iniciando upload: {unique_filename}")
+        
+        # Timestamp de início do upload
+        timestamp_upload_inicio = time.time()
         
         # Obter cliente S3 (inicializa se necessário)
         try:
@@ -284,20 +429,98 @@ def upload_file():
                 "detail": f"Ocorreu um erro inesperado durante o upload. Tente novamente ou entre em contato com o suporte se o problema persistir."
             }), 500
         
+        # Timestamp de fim do upload
+        timestamp_upload_fim = time.time()
+        timestamp_fim = datetime.now()
+        timestamp_fim_iso = timestamp_fim.isoformat()
+        
+        # Calcular duração total e do upload
+        duracao_total_segundos = timestamp_upload_fim - timestamp_inicio_unix
+        duracao_upload_segundos = timestamp_upload_fim - timestamp_upload_inicio
+        
+        # Calcular velocidade de upload (bytes por segundo e Mbps)
+        velocidade_bytes_por_segundo = size / duracao_upload_segundos if duracao_upload_segundos > 0 else 0
+        velocidade_mbps = (velocidade_bytes_por_segundo * 8) / (1024 * 1024)  # Converter para Mbps
+        
+        # Formatação de durações
+        duracao_total_info = format_duration_human(duracao_total_segundos)
+        duracao_upload_info = format_duration_human(duracao_upload_segundos)
+        
         # URL pública do arquivo
         file_url = f"https://{SPACES_BUCKET}.{SPACES_REGION}.digitaloceanspaces.com/{unique_filename}"
         
         print(f"✅ Upload concluído: {file_url}")
         logger.info(f"Upload concluído: {file_url}")
         
-        return jsonify({
-            "success": True, 
+        # Montar resposta enriquecida
+        response_data = {
+            "success": True,
+            "arquivo": {
+                "id": unique_filename,
+                "nome_original": original_filename,
+                "nome_armazenado": unique_filename,
+                "hash_md5": file_hash,
+                "tamanho": size_info,
+                "tipo_mime": file.content_type or 'application/octet-stream',
+                "extensao": file_extension,
+                "categoria": file_category,
+                "url_publica": file_url,
+                "url_cdn": file_url,
+                "descricao_humana": f"Arquivo {file_category['categoria_descricao'].lower()} '{original_filename}' ({size_info['descricao_humana']})"
+            },
+            "sessao": {
+                "id_sessao": str(uuid.uuid4()),
+                "ip_cliente": client_info["ip"],
+                "ip_original": client_info["ip_original"],
+                "user_agent": client_info["user_agent"],
+                "referer": client_info["referer"],
+                "idioma_preferido": client_info["accept_language"],
+                "headers": client_info["headers"],
+                "descricao_humana": f"Requisição de {client_info['ip']} via {client_info['user_agent'][:50]}..."
+            },
+            "upload": {
+                "timestamp_inicio": timestamp_inicio_iso,
+                "timestamp_inicio_unix": timestamp_inicio_unix,
+                "timestamp_fim": timestamp_fim_iso,
+                "timestamp_fim_unix": timestamp_upload_fim,
+                "duracao_total": duracao_total_info,
+                "duracao_upload": duracao_upload_info,
+                "velocidade_bytes_por_segundo": round(velocidade_bytes_por_segundo, 2),
+                "velocidade_mbps": round(velocidade_mbps, 2),
+                "velocidade_formatted": f"{round(velocidade_mbps, 2)} Mbps",
+                "status": "concluido",
+                "bucket": SPACES_BUCKET,
+                "regiao": SPACES_REGION,
+                "endpoint": SPACES_ENDPOINT,
+                "descricao_humana": f"Upload concluído em {duracao_upload_info['descricao_humana']} com velocidade média de {round(velocidade_mbps, 2)} Mbps"
+            },
+            "analytics": {
+                "id_transacao": str(uuid.uuid4()),
+                "timestamp_processamento": datetime.now().isoformat(),
+                "tamanho_bytes": size,
+                "tamanho_mb": round(size_info["megabytes"], 4),
+                "duracao_segundos": round(duracao_total_segundos, 3),
+                "velocidade_mbps": round(velocidade_mbps, 4),
+                "categoria_arquivo": file_category["categoria"],
+                "tipo_midia": file_category["tipo_midia"],
+                "hash_arquivo": file_hash,
+                "ip_cliente": client_info["ip"],
+                "metrica_performance": {
+                    "tempo_processamento_ms": round(duracao_total_segundos * 1000, 2),
+                    "tempo_upload_ms": round(duracao_upload_segundos * 1000, 2),
+                    "throughput_bytes_per_sec": round(velocidade_bytes_por_segundo, 2),
+                    "throughput_mbps": round(velocidade_mbps, 4)
+                }
+            },
+            # Campos legados para compatibilidade
             "url": file_url,
             "filename": unique_filename,
             "original_filename": original_filename,
             "size": size,
             "content_type": file.content_type
-        })
+        }
+        
+        return jsonify(response_data)
         
     except RequestEntityTooLarge:
         # Este erro já é tratado pelo handler específico, mas incluímos aqui como backup
