@@ -603,6 +603,12 @@
             "description": "URL pública do arquivo (campo legado para compatibilidade)",
             "example": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4"
           },
+          "callback_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL pública do arquivo JSON com o callback completo salvo no mesmo diretório",
+            "example": "https://cod5.nyc3.digitaloceanspaces.com/uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.json"
+          },
           "filename": {
             "type": "string",
             "description": "Nome único gerado (campo legado)",
