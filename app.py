@@ -261,6 +261,10 @@ def get_file_category(content_type: str, extension: str) -> Dict[str, Any]:
 
 def validate_and_sanitize_folder(folder: Optional[str]) -> str:
     """Valida e sanitiza o nome do diretório, prevenindo path traversal"""
+    # Garantir que folder seja string ou None
+    if folder is not None and not isinstance(folder, str):
+        folder = str(folder)
+    
     if not folder:
         if not DEFAULT_UPLOAD_DIR:
             logger.error("DEFAULT_UPLOAD_DIR não configurado e nenhum folder fornecido")
@@ -268,7 +272,13 @@ def validate_and_sanitize_folder(folder: Optional[str]) -> str:
         return DEFAULT_UPLOAD_DIR
     
     # Remover espaços e caracteres perigosos
-    folder = folder.strip()
+    folder = str(folder).strip()
+    
+    # Se após strip ficar vazio, usar default
+    if not folder:
+        if not DEFAULT_UPLOAD_DIR:
+            raise ValueError("DEFAULT_UPLOAD_DIR não está configurado")
+        return DEFAULT_UPLOAD_DIR
     
     # Prevenir path traversal
     if '..' in folder or folder.startswith('/') or '\\' in folder:
@@ -278,7 +288,7 @@ def validate_and_sanitize_folder(folder: Optional[str]) -> str:
         return DEFAULT_UPLOAD_DIR
     
     # Permitir apenas letras, números, hífen, underscore e barras
-    folder = re.sub(r'[^a-zA-Z0-9\-_/]', '', folder)
+    folder = re.sub(r'[^a-zA-Z0-9\-_/]', '', str(folder))
     
     # Remover barras duplicadas e barras no início/fim
     folder = re.sub(r'/+', '/', folder)
@@ -425,19 +435,21 @@ def health_check():
     """Endpoint para verificar se a API está funcionando"""
     try:
         # Verificar se as credenciais estão configuradas
-        if not SPACES_KEY or not SPACES_SECRET:
+        if not SPACES_KEY or not SPACES_SECRET or not SPACES_BUCKET or not SPACES_REGION or not SPACES_ENDPOINT:
             return jsonify({
                 "status": "unhealthy",
                 "timestamp": datetime.now().isoformat(),
                 "service": "upload-cdn-api",
-                "error": "Credenciais do Spaces não configuradas"
+                "error": "Configurações do Spaces não completas"
             }), 503
         
         # Tentar inicializar o cliente S3 para verificar conectividade
         try:
             test_client = get_s3_client()
             # Fazer uma operação simples para verificar conectividade
-            test_client.head_bucket(Bucket=SPACES_BUCKET)
+            # Usar head_bucket apenas se bucket estiver configurado como string
+            if isinstance(SPACES_BUCKET, str) and SPACES_BUCKET:
+                test_client.head_bucket(Bucket=SPACES_BUCKET)
         except Exception as e:
             logger.warning(f"Erro ao verificar conectividade com Spaces: {e}")
             return jsonify({
@@ -533,6 +545,9 @@ def upload_file():
         
         # Capturar parâmetro de diretório (opcional)
         folder_param = request.form.get('folder') or request.args.get('folder')
+        # Garantir que seja string ou None
+        if folder_param is not None:
+            folder_param = str(folder_param).strip() if folder_param else None
         target_folder = validate_and_sanitize_folder(folder_param)
         
         # Gerar nome único para o arquivo
