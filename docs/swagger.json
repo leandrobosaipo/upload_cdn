@@ -119,6 +119,11 @@
                     "type": "string",
                     "format": "binary",
                     "description": "Arquivo a ser enviado. Tipos permitidos: mp4, avi, mov, mkv, webm, jpg, jpeg, png, gif, pdf, doc, docx"
+                  },
+                  "folder": {
+                    "type": "string",
+                    "description": "Subdiretório opcional onde o arquivo será armazenado (ex.: campanhas/2025/11, marketing/black-friday). Se não fornecido, usa o diretório padrão configurado. Caracteres permitidos: letras, números, hífen, underscore e barras.",
+                    "example": "marketing/black-friday"
                   }
                 }
               },
@@ -164,9 +169,31 @@
                           "tipo_midia": "Áudio e Vídeo",
                           "extensao": "mp4"
                         },
-                        "url_publica": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
-                        "url_cdn": "https://cod5.nyc3.digitaloceanspaces.com/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
-                        "descricao_humana": "Arquivo vídeo 'meu_video.mp4' (1.26 megabytes)"
+                        "diretorio": "uploads",
+                        "caminho_completo": "uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "url_publica": "https://cod5.nyc3.digitaloceanspaces.com/uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "url_cdn": "https://cod5.nyc3.digitaloceanspaces.com/uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4",
+                        "descricao_humana": "Arquivo vídeo 'meu_video.mp4' (1.26 megabytes)",
+                        "midia": {
+                          "duracao_segundos": 12.345,
+                          "duracao_formatada": "00:00:12.345",
+                          "bitrate_total_bps": 4800000,
+                          "bitrate_total_mbps": 4.8,
+                          "compressao": "VBR",
+                          "codec_video": "h264",
+                          "resolucao": "1920x1080",
+                          "largura": 1920,
+                          "altura": 1080,
+                          "fps": 29.97,
+                          "frames_estimados": 370,
+                          "proporcao_aspecto": "16:9",
+                          "pixel_format": "yuv420p",
+                          "codec_audio": "aac",
+                          "sample_rate": 48000,
+                          "canais": 2,
+                          "bitrate_audio": 128000,
+                          "descricao_humana": "Vídeo 1920x1080 em h264, áudio aac, 00:00:12.345, 4.80 Mbps"
+                        }
                       },
                       "sessao": {
                         "id_sessao": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -463,9 +490,35 @@
                   "extensao": {"type": "string", "example": "mp4"}
                 }
               },
+              "diretorio": {"type": "string", "description": "Diretório onde o arquivo foi armazenado", "example": "uploads"},
+              "caminho_completo": {"type": "string", "description": "Caminho completo no bucket (diretório + nome do arquivo)", "example": "uploads/c2aa6f8b-fc41-4969-b1fd-85f8512e10e7.mp4"},
               "url_publica": {"type": "string", "format": "uri"},
               "url_cdn": {"type": "string", "format": "uri"},
-              "descricao_humana": {"type": "string", "example": "Arquivo vídeo 'meu_video.mp4' (1.26 megabytes)"}
+              "descricao_humana": {"type": "string", "example": "Arquivo vídeo 'meu_video.mp4' (1.26 megabytes)"},
+              "midia": {
+                "type": "object",
+                "description": "Metadados de mídia extraídos (disponível apenas para vídeos e áudios)",
+                "properties": {
+                  "duracao_segundos": {"type": "number", "example": 12.345},
+                  "duracao_formatada": {"type": "string", "example": "00:00:12.345"},
+                  "bitrate_total_bps": {"type": "integer", "example": 4800000},
+                  "bitrate_total_mbps": {"type": "number", "example": 4.8},
+                  "compressao": {"type": "string", "example": "VBR"},
+                  "codec_video": {"type": "string", "example": "h264"},
+                  "resolucao": {"type": "string", "example": "1920x1080"},
+                  "largura": {"type": "integer", "example": 1920},
+                  "altura": {"type": "integer", "example": 1080},
+                  "fps": {"type": "number", "example": 29.97},
+                  "frames_estimados": {"type": "integer", "example": 370},
+                  "proporcao_aspecto": {"type": "string", "example": "16:9"},
+                  "pixel_format": {"type": "string", "example": "yuv420p"},
+                  "codec_audio": {"type": "string", "example": "aac"},
+                  "sample_rate": {"type": "integer", "example": 48000},
+                  "canais": {"type": "integer", "example": 2},
+                  "bitrate_audio": {"type": "integer", "example": 128000},
+                  "descricao_humana": {"type": "string", "example": "Vídeo 1920x1080 em h264, áudio aac, 00:00:12.345, 4.80 Mbps"}
+                }
+              }
             }
           },
           "sessao": {
@@ -530,6 +583,7 @@
               "tipo_midia": {"type": "string"},
               "hash_arquivo": {"type": "string"},
               "ip_cliente": {"type": "string"},
+              "diretorio": {"type": "string", "description": "Diretório onde o arquivo foi armazenado"},
               "metrica_performance": {
                 "type": "object",
                 "properties": {

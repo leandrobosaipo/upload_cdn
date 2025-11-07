@@ -1,8 +1,9 @@
 FROM python:3.10-slim
 
-# Instalar dependências do sistema
+# Instalar dependências do sistema incluindo ffmpeg para extração de metadados
 RUN apt-get update && apt-get install -y \
     gcc \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Definir diretório de trabalho

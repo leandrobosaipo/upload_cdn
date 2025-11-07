@@ -10,7 +10,11 @@ import logging
 import botocore.exceptions
 import hashlib
 import time
-from typing import Dict, Any
+import json
+import subprocess
+import tempfile
+import re
+from typing import Dict, Any, Optional
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +58,9 @@ SPACES_ENDPOINT = "https://nyc3.digitaloceanspaces.com"
 SPACES_BUCKET = "cod5"
 SPACES_KEY = os.environ.get("SPACES_KEY")
 SPACES_SECRET = os.environ.get("SPACES_SECRET")
+
+# Configuração de diretório padrão para uploads
+DEFAULT_UPLOAD_DIR = os.environ.get("DEFAULT_UPLOAD_DIR", "uploads")
 
 print(f"🔧 Configurações carregadas:")
 print(f"   - SPACES_REGION: {SPACES_REGION}")
@@ -225,6 +232,162 @@ def get_file_category(content_type: str, extension: str) -> Dict[str, Any]:
         "extensao": extension_lower
     }
 
+def validate_and_sanitize_folder(folder: Optional[str]) -> str:
+    """Valida e sanitiza o nome do diretório, prevenindo path traversal"""
+    if not folder:
+        return DEFAULT_UPLOAD_DIR
+    
+    # Remover espaços e caracteres perigosos
+    folder = folder.strip()
+    
+    # Prevenir path traversal
+    if '..' in folder or folder.startswith('/') or '\\' in folder:
+        logger.warning(f"Tentativa de path traversal detectada: {folder}")
+        return DEFAULT_UPLOAD_DIR
+    
+    # Permitir apenas letras, números, hífen, underscore e barras
+    folder = re.sub(r'[^a-zA-Z0-9\-_/]', '', folder)
+    
+    # Remover barras duplicadas e barras no início/fim
+    folder = re.sub(r'/+', '/', folder)
+    folder = folder.strip('/')
+    
+    # Limitar tamanho
+    if len(folder) > 200:
+        folder = folder[:200]
+    
+    return folder if folder else DEFAULT_UPLOAD_DIR
+
+def extract_media_metadata(file_path: str, content_type: str) -> Optional[Dict[str, Any]]:
+    """Extrai metadados de mídia usando ffprobe"""
+    # Só tentar extrair metadados para vídeos e áudios
+    if not content_type or ('video' not in content_type.lower() and 'audio' not in content_type.lower()):
+        return None
+    
+    try:
+        # Comando ffprobe para extrair metadados em JSON
+        cmd = [
+            'ffprobe',
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            '-show_streams',
+            file_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode != 0:
+            logger.warning(f"ffprobe retornou código {result.returncode}: {result.stderr}")
+            return None
+        
+        data = json.loads(result.stdout)
+        
+        # Extrair informações dos streams
+        video_stream = None
+        audio_stream = None
+        
+        for stream in data.get('streams', []):
+            if stream.get('codec_type') == 'video' and not video_stream:
+                video_stream = stream
+            elif stream.get('codec_type') == 'audio' and not audio_stream:
+                audio_stream = stream
+        
+        # Extrair informações do formato
+        format_info = data.get('format', {})
+        duration = float(format_info.get('duration', 0))
+        bitrate = int(format_info.get('bit_rate', 0))
+        size = int(format_info.get('size', 0))
+        
+        # Processar informações de vídeo
+        video_info = {}
+        if video_stream:
+            width = int(video_stream.get('width', 0))
+            height = int(video_stream.get('height', 0))
+            codec = video_stream.get('codec_name', 'unknown')
+            fps_str = video_stream.get('r_frame_rate', '0/1')
+            
+            # Calcular FPS
+            fps = 0
+            if '/' in fps_str:
+                num, den = map(int, fps_str.split('/'))
+                fps = num / den if den > 0 else 0
+            
+            # Estimar número de frames
+            frames_estimated = int(duration * fps) if fps > 0 else 0
+            
+            video_info = {
+                "codec_video": codec,
+                "resolucao": f"{width}x{height}",
+                "largura": width,
+                "altura": height,
+                "fps": round(fps, 2),
+                "frames_estimados": frames_estimated,
+                "proporcao_aspecto": video_stream.get('display_aspect_ratio', ''),
+                "pixel_format": video_stream.get('pix_fmt', '')
+            }
+        
+        # Processar informações de áudio
+        audio_info = {}
+        if audio_stream:
+            audio_info = {
+                "codec_audio": audio_stream.get('codec_name', 'unknown'),
+                "sample_rate": int(audio_stream.get('sample_rate', 0)),
+                "canais": int(audio_stream.get('channels', 0)),
+                "bitrate_audio": int(audio_stream.get('bit_rate', 0))
+            }
+        
+        # Formatar duração
+        hours = int(duration // 3600)
+        minutes = int((duration % 3600) // 60)
+        seconds = int(duration % 60)
+        milliseconds = int((duration % 1) * 1000)
+        duracao_formatada = f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+        
+        # Determinar tipo de compressão (CBR/VBR)
+        compressao = "VBR"  # Padrão VBR
+        if bitrate > 0:
+            # Tentar determinar se é CBR verificando variação de bitrate
+            compressao = "CBR"  # Simplificado, pode ser melhorado
+        
+        # Calcular bitrate em Mbps
+        bitrate_mbps = (bitrate / 1000000) if bitrate > 0 else 0
+        
+        # Montar descrição humana
+        desc_parts = []
+        if video_info:
+            desc_parts.append(f"Vídeo {video_info.get('resolucao', '')} em {video_info.get('codec_video', '')}")
+        if audio_info:
+            desc_parts.append(f"áudio {audio_info.get('codec_audio', '')}")
+        if duration > 0:
+            desc_parts.append(f"{duracao_formatada}")
+        if bitrate_mbps > 0:
+            desc_parts.append(f"{bitrate_mbps:.2f} Mbps")
+        
+        descricao_humana = ", ".join(desc_parts) if desc_parts else "Metadados de mídia disponíveis"
+        
+        return {
+            "duracao_segundos": round(duration, 3),
+            "duracao_formatada": duracao_formatada,
+            "bitrate_total_bps": bitrate,
+            "bitrate_total_mbps": round(bitrate_mbps, 2),
+            "compressao": compressao,
+            "tamanho_bytes": size,
+            **video_info,
+            **audio_info,
+            "descricao_humana": descricao_humana
+        }
+        
+    except subprocess.TimeoutExpired:
+        logger.warning("Timeout ao extrair metadados com ffprobe")
+        return None
+    except json.JSONDecodeError as e:
+        logger.warning(f"Erro ao decodificar JSON do ffprobe: {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Erro ao extrair metadados: {e}")
+        return None
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar se a API está funcionando"""
@@ -336,6 +499,10 @@ def upload_file():
                 "detail": f"O tamanho do arquivo excede o limite máximo permitido. Tamanho máximo configurado: {max_content_length_mb}MB. Tamanho do arquivo enviado: {size / 1024 / 1024:.2f}MB"
             }), 413
         
+        # Capturar parâmetro de diretório (opcional)
+        folder_param = request.form.get('folder') or request.args.get('folder')
+        target_folder = validate_and_sanitize_folder(folder_param)
+        
         # Gerar nome único para o arquivo
         original_filename = secure_filename(file.filename)
         file_extension = original_filename.rsplit('.', 1)[1].lower()
@@ -351,10 +518,40 @@ def upload_file():
         file_category = get_file_category(file.content_type or '', file_extension)
         
         print(f"📏 Tamanho do arquivo: {size} bytes ({size_info['formatted']})")
-        logger.info(f"Tamanho do arquivo: {size} bytes")
+        print(f"📁 Diretório destino: {target_folder}")
+        logger.info(f"Tamanho do arquivo: {size} bytes, Diretório: {target_folder}")
         
-        print(f"🔄 Iniciando upload: {unique_filename}")
-        logger.info(f"Iniciando upload: {unique_filename}")
+        # Salvar arquivo temporariamente para extração de metadados
+        temp_file_path = None
+        media_metadata = None
+        
+        try:
+            # Criar arquivo temporário
+            temp_fd, temp_file_path = tempfile.mkstemp(suffix=f".{file_extension}")
+            file.stream.seek(0)
+            
+            with os.fdopen(temp_fd, 'wb') as temp_file:
+                file.stream.seek(0)
+                temp_file.write(file.stream.read())
+            
+            # Extrair metadados de mídia
+            print("🔍 Extraindo metadados de mídia...")
+            media_metadata = extract_media_metadata(temp_file_path, file.content_type or '')
+            
+            if media_metadata:
+                print(f"✅ Metadados extraídos: {media_metadata.get('descricao_humana', 'N/A')}")
+            else:
+                print("ℹ️ Metadados não disponíveis para este tipo de arquivo")
+            
+            # Resetar stream do arquivo para upload
+            file.stream.seek(0)
+            
+        except Exception as e:
+            logger.warning(f"Erro ao processar arquivo temporário ou extrair metadados: {e}")
+            # Continuar mesmo se falhar a extração de metadados
+        
+        print(f"🔄 Iniciando upload: {target_folder}/{unique_filename}")
+        logger.info(f"Iniciando upload: {target_folder}/{unique_filename}")
         
         # Timestamp de início do upload
         timestamp_upload_inicio = time.time()
@@ -381,12 +578,15 @@ def upload_file():
                 "detail": "Não foi possível inicializar a conexão com o DigitalOcean Spaces. Verifique as configurações."
             }), 503
         
+        # Montar caminho completo com diretório
+        s3_key = f"{target_folder}/{unique_filename}" if target_folder else unique_filename
+        
         # Upload para o Spaces
         try:
             s3_client.upload_fileobj(
                 Fileobj=file,
                 Bucket=SPACES_BUCKET,
-                Key=unique_filename,
+                Key=s3_key,
                 ExtraArgs={
                     'ACL': 'public-read', 
                     'ContentType': file.content_type or 'application/octet-stream'
@@ -446,28 +646,43 @@ def upload_file():
         duracao_total_info = format_duration_human(duracao_total_segundos)
         duracao_upload_info = format_duration_human(duracao_upload_segundos)
         
+        # Limpar arquivo temporário se existir
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except Exception as e:
+                logger.warning(f"Erro ao remover arquivo temporário: {e}")
+        
         # URL pública do arquivo
-        file_url = f"https://{SPACES_BUCKET}.{SPACES_REGION}.digitaloceanspaces.com/{unique_filename}"
+        file_url = f"https://{SPACES_BUCKET}.{SPACES_REGION}.digitaloceanspaces.com/{s3_key}"
         
         print(f"✅ Upload concluído: {file_url}")
         logger.info(f"Upload concluído: {file_url}")
         
         # Montar resposta enriquecida
+        arquivo_data = {
+            "id": unique_filename,
+            "nome_original": original_filename,
+            "nome_armazenado": unique_filename,
+            "hash_md5": file_hash,
+            "tamanho": size_info,
+            "tipo_mime": file.content_type or 'application/octet-stream',
+            "extensao": file_extension,
+            "categoria": file_category,
+            "diretorio": target_folder,
+            "caminho_completo": s3_key,
+            "url_publica": file_url,
+            "url_cdn": file_url,
+            "descricao_humana": f"Arquivo {file_category['categoria_descricao'].lower()} '{original_filename}' ({size_info['descricao_humana']})"
+        }
+        
+        # Adicionar metadados de mídia se disponíveis
+        if media_metadata:
+            arquivo_data["midia"] = media_metadata
+        
         response_data = {
             "success": True,
-            "arquivo": {
-                "id": unique_filename,
-                "nome_original": original_filename,
-                "nome_armazenado": unique_filename,
-                "hash_md5": file_hash,
-                "tamanho": size_info,
-                "tipo_mime": file.content_type or 'application/octet-stream',
-                "extensao": file_extension,
-                "categoria": file_category,
-                "url_publica": file_url,
-                "url_cdn": file_url,
-                "descricao_humana": f"Arquivo {file_category['categoria_descricao'].lower()} '{original_filename}' ({size_info['descricao_humana']})"
-            },
+            "arquivo": arquivo_data,
             "sessao": {
                 "id_sessao": str(uuid.uuid4()),
                 "ip_cliente": client_info["ip"],
@@ -505,6 +720,7 @@ def upload_file():
                 "tipo_midia": file_category["tipo_midia"],
                 "hash_arquivo": file_hash,
                 "ip_cliente": client_info["ip"],
+                "diretorio": target_folder,
                 "metrica_performance": {
                     "tempo_processamento_ms": round(duracao_total_segundos * 1000, 2),
                     "tempo_upload_ms": round(duracao_upload_segundos * 1000, 2),
