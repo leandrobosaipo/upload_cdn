@@ -363,7 +363,12 @@ app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 @app.route('/swagger.json')
 def swagger_json():
     """Serve o arquivo swagger.json para a documentação"""
-    return send_from_directory('docs', 'swagger.json')
+    response = send_from_directory('docs', 'swagger.json')
+    # Adicionar headers CORS para permitir acesso do Swagger UI
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
 
 # Handler para arquivos muito grandes
 @app.errorhandler(RequestEntityTooLarge)

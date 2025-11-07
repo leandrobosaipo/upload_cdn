@@ -11,12 +11,8 @@
   },
   "servers": [
     {
-      "url": "https://seu-dominio.com",
-      "description": "Servidor de produção"
-    },
-    {
-      "url": "http://localhost:8080",
-      "description": "Servidor local de desenvolvimento"
+      "url": "/",
+      "description": "Servidor atual (mesma origem)"
     }
   ],
   "tags": [
