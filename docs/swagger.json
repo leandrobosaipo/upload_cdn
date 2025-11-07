@@ -1,0 +1,425 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Upload CDN API",
+    "description": "API para upload de arquivos para DigitalOcean Spaces (CDN). Suporta vídeos, imagens e documentos. Todos os arquivos são armazenados com nomes únicos e retornam URLs públicas.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Suporte API",
+      "email": "suporte@exemplo.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://seu-dominio.com",
+      "description": "Servidor de produção"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Servidor local de desenvolvimento"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Informações",
+      "description": "Endpoints de informações sobre a API"
+    },
+    {
+      "name": "Health Check",
+      "description": "Verificação de status da API"
+    },
+    {
+      "name": "Upload",
+      "description": "Upload de arquivos para o CDN"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["Informações"],
+        "summary": "Informações da API",
+        "description": "Retorna informações sobre a API, endpoints disponíveis e formatos suportados.",
+        "operationId": "getApiInfo",
+        "responses": {
+          "200": {
+            "description": "Informações da API retornadas com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiInfo"
+                },
+                "example": {
+                  "message": "Upload CDN API",
+                  "version": "1.0.0",
+                  "endpoints": {
+                    "POST /upload": "Upload de arquivos",
+                    "GET /health": "Status da API",
+                    "GET /": "Informações da API"
+                  },
+                  "supported_formats": ["mp4", "avi", "mov", "mkv", "webm", "jpg", "jpeg", "png", "gif", "pdf", "doc", "docx"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health Check"],
+        "summary": "Verificar status da API",
+        "description": "Endpoint de health check para verificar se a API está funcionando corretamente. Retorna o status atual e timestamp.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "API está funcionando corretamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "healthy",
+                  "timestamp": "2024-01-15T10:30:00.123456",
+                  "service": "upload-cdn-api"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serviço indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": "Serviço temporariamente indisponível",
+                  "detail": "Não foi possível conectar ao serviço de armazenamento"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload": {
+      "post": {
+        "tags": ["Upload"],
+        "summary": "Upload de arquivo",
+        "description": "Faz upload de um arquivo para o DigitalOcean Spaces. O arquivo recebe um nome único (UUID) e retorna a URL pública para acesso. Tipos de arquivo suportados: vídeos (mp4, avi, mov, mkv, webm), imagens (jpg, jpeg, png, gif) e documentos (pdf, doc, docx).",
+        "operationId": "uploadFile",
+        "requestBody": {
+          "required": true,
+          "description": "Arquivo a ser enviado. Deve ser um arquivo válido dentro dos tipos permitidos e dentro do tamanho máximo configurado.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Arquivo a ser enviado. Tipos permitidos: mp4, avi, mov, mkv, webm, jpg, jpeg, png, gif, pdf, doc, docx"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/octet-stream"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload realizado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSuccessResponse"
+                },
+                "examples": {
+                  "video": {
+                    "summary": "Upload de vídeo",
+                    "value": {
+                      "success": true,
+                      "url": "https://cod5.nyc3.digitaloceanspaces.com/a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4",
+                      "filename": "a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4",
+                      "original_filename": "meu_video.mp4",
+                      "size": 52428800,
+                      "content_type": "video/mp4"
+                    }
+                  },
+                  "image": {
+                    "summary": "Upload de imagem",
+                    "value": {
+                      "success": true,
+                      "url": "https://cod5.nyc3.digitaloceanspaces.com/b2c3d4e5-f6a7-8901-bcde-f12345678901.jpg",
+                      "filename": "b2c3d4e5-f6a7-8901-bcde-f12345678901.jpg",
+                      "original_filename": "foto.jpg",
+                      "size": 1048576,
+                      "content_type": "image/jpeg"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro de validação na requisição",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "sem_arquivo": {
+                    "summary": "Nenhum arquivo fornecido",
+                    "value": {
+                      "success": false,
+                      "error": "Nenhum arquivo fornecido",
+                      "detail": "É necessário enviar um arquivo no campo 'file' usando multipart/form-data"
+                    }
+                  },
+                  "arquivo_vazio": {
+                    "summary": "Arquivo sem nome ou vazio",
+                    "value": {
+                      "success": false,
+                      "error": "Arquivo sem nome ou vazio",
+                      "detail": "O arquivo enviado não possui nome ou está vazio. Verifique se o arquivo foi selecionado corretamente."
+                    }
+                  },
+                  "tipo_invalido": {
+                    "summary": "Tipo de arquivo não permitido",
+                    "value": {
+                      "success": false,
+                      "error": "Tipo de arquivo não permitido. Tipos aceitos: mp4, avi, mov, mkv, webm, jpg, jpeg, png, gif, pdf, doc, docx",
+                      "detail": "O arquivo enviado não está em um formato suportado. Use apenas os tipos listados."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Arquivo muito grande",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": "Arquivo muito grande",
+                  "detail": "O tamanho do arquivo excede o limite máximo permitido. Tamanho máximo configurado: 100MB. Tamanho do arquivo enviado: 150MB"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serviço de armazenamento indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "spaces_indisponivel": {
+                    "summary": "DigitalOcean Spaces fora do ar",
+                    "value": {
+                      "success": false,
+                      "error": "Serviço de armazenamento temporariamente indisponível",
+                      "detail": "Não foi possível conectar ao DigitalOcean Spaces. Tente novamente em alguns instantes."
+                    }
+                  },
+                  "credenciais_invalidas": {
+                    "summary": "Credenciais não configuradas",
+                    "value": {
+                      "success": false,
+                      "error": "Credenciais do Spaces não configuradas",
+                      "detail": "As variáveis de ambiente SPACES_KEY e SPACES_SECRET não estão configuradas corretamente."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "success": false,
+                  "error": "Erro interno do servidor",
+                  "detail": "Ocorreu um erro inesperado durante o processamento. Entre em contato com o suporte se o problema persistir."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": [],
+        "summary": "Documentação Swagger UI",
+        "description": "Interface interativa de documentação da API usando Swagger UI",
+        "operationId": "swaggerUI",
+        "responses": {
+          "200": {
+            "description": "Interface Swagger UI carregada"
+          }
+        }
+      }
+    },
+    "/swagger.json": {
+      "get": {
+        "tags": [],
+        "summary": "Especificação OpenAPI",
+        "description": "Retorna a especificação OpenAPI completa da API em formato JSON",
+        "operationId": "swaggerJson",
+        "responses": {
+          "200": {
+            "description": "Especificação OpenAPI retornada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiInfo": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Nome da API",
+            "example": "Upload CDN API"
+          },
+          "version": {
+            "type": "string",
+            "description": "Versão da API",
+            "example": "1.0.0"
+          },
+          "endpoints": {
+            "type": "object",
+            "description": "Lista de endpoints disponíveis",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "POST /upload": "Upload de arquivos",
+              "GET /health": "Status da API",
+              "GET /": "Informações da API"
+            }
+          },
+          "supported_formats": {
+            "type": "array",
+            "description": "Formatos de arquivo suportados",
+            "items": {
+              "type": "string"
+            },
+            "example": ["mp4", "avi", "mov", "mkv", "webm", "jpg", "jpeg", "png", "gif", "pdf", "doc", "docx"]
+          }
+        },
+        "required": ["message", "version", "endpoints", "supported_formats"]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Status da API",
+            "enum": ["healthy", "unhealthy"],
+            "example": "healthy"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp da verificação",
+            "example": "2024-01-15T10:30:00.123456"
+          },
+          "service": {
+            "type": "string",
+            "description": "Nome do serviço",
+            "example": "upload-cdn-api"
+          }
+        },
+        "required": ["status", "timestamp", "service"]
+      },
+      "UploadSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se o upload foi bem-sucedido",
+            "example": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL pública do arquivo no CDN",
+            "example": "https://cod5.nyc3.digitaloceanspaces.com/a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Nome único gerado para o arquivo (UUID)",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4"
+          },
+          "original_filename": {
+            "type": "string",
+            "description": "Nome original do arquivo enviado",
+            "example": "meu_video.mp4"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Tamanho do arquivo em bytes",
+            "example": 52428800
+          },
+          "content_type": {
+            "type": "string",
+            "description": "Tipo MIME do arquivo",
+            "example": "video/mp4"
+          }
+        },
+        "required": ["success", "url", "filename", "original_filename", "size", "content_type"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida (sempre false em caso de erro)",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "description": "Mensagem de erro resumida",
+            "example": "Tipo de arquivo não permitido"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Detalhes adicionais sobre o erro, útil para debugging e orientação do usuário",
+            "example": "O arquivo enviado não está em um formato suportado. Use apenas os tipos listados."
+          }
+        },
+        "required": ["success", "error"]
+      }
+    }
+  }
+}
+
